@@ -80,7 +80,7 @@ android {
     namespace "com.paxbridgern"
     defaultConfig {
         applicationId "com.paxbridgern"
-        minSdkVersion rootProject.ext.minSdkVersion
+        minSdkVersion 26
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
@@ -110,6 +110,12 @@ android {
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
+    
+    // EMV Handheld Library
+    implementation project(':emvHandheldLib')
+    
+    // dsiEMVAndroid AAR file
+    implementation files('libs/dsiEMVAndroid.aar')
 
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")
