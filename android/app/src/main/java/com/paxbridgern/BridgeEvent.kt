@@ -1,0 +1,24 @@
+package com.paxbridgern
+
+class BridgeEvent {
+    companion object {
+        val ERROR_EVENT = "ERROR_EVENT"
+
+        val SALE_SUCCESS = "SALE_SUCCESS"
+
+        val PREPAID_READ_SUCCESS = "PREPAID_READ_SUCCESS"
+
+        val RECURRING_SALE_SUCCESS = "RECURRING_SALE_SUCCESS"
+
+        val ZERO_AUTH_SUCCESS = "ZERO_AUTH_SUCCESS"
+
+        val CLIENT_VERSION_FETCH_SUCCESS = "CLIENT_VERSION_FETCH_SUCCESS"
+
+        val MESSAGE_EVENT = "MESSAGE_EVENT"
+
+        val CONFIG_PING_SUCCESS = "CONFIG_PING_SUCCESS"
+        val CONFIG_PING_FAIL = "CONFIG_PING_FAIL"
+        val CONFIG_ERROR = "CONFIG_ERROR"
+        val CONFIG_COMPLETED = "CONFIG_COMPLETED"
+    }
+}

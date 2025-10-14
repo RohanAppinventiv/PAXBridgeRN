@@ -135,7 +135,6 @@ internal class DsiEMVRequestBuilder(config: ConfigFactory) {
         return """<?xml version="1.0"?>
         <TStream>
         <Transaction>
-            <ComPort>${comPort}</ComPort>
             <PinPadIpAddress>${pinPadIPAddress}</PinPadIpAddress>
             <PinPadIpPort>${pinPadPort}</PinPadIpPort>
             <OperationMode>${operationMode}</OperationMode>

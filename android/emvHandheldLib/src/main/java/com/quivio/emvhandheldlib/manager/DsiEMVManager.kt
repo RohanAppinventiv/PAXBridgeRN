@@ -24,68 +24,15 @@ class DsiEMVManager(
     posConfig: ConfigFactory
 ) {
     private var currentPosState: PosState = PosState.IDLE
-
     private var communicator: EMVTransactionCommunicator? = null
     private var configCommunicator: ConfigurationCommunicator? = null
-
     private var transactionAmount: String? = null
-
     private val posTransactionExecutor by lazy {
         POSTransactionExecutor(context, posConfig)
     }
-
     private val posXMLResponseExtractor by lazy {
         XMLResponseExtractor()
     }
-
-    private suspend fun resetPinPad() {
-        posTransactionExecutor.resetPinPad()
-    }
-
-    private suspend fun downloadConfigParams() = withContext(Dispatchers.IO) {
-        Log.d(PRINT_TAG, "Download Config Initiated: $currentPosState")
-        posTransactionExecutor.downloadConfig()
-    }
-
-    suspend fun cancelTransaction(){
-        posTransactionExecutor.cancelTransaction()
-    }
-
-    suspend fun runSaleTransaction(amount: String) = withContext(Dispatchers.IO) {
-        posTransactionExecutor.doSale(amount)
-    }
-
-    suspend fun runRecurringTransaction(amount: String) = withContext(Dispatchers.IO) {
-        posTransactionExecutor.doRecurringSale(amount)
-    }
-
-    suspend fun replaceCardInRecurring() = withContext(Dispatchers.IO) {
-        posTransactionExecutor.doReplaceCardInRecurring()
-    }
-
-    suspend fun getClientVersion() = withContext(Dispatchers.IO) {
-        posTransactionExecutor.getClientVersion()
-    }
-
-    suspend fun readPrepaidCard() = withContext(Dispatchers.IO) {
-        posTransactionExecutor.readPrepaidCard()
-    }
-
-    fun registerListener(
-        communicator: EMVTransactionCommunicator,
-        configurationCommunicator: ConfigurationCommunicator? = null
-    ) {
-        this.communicator = communicator
-        this.configCommunicator = configurationCommunicator
-        posTransactionExecutor.addPosTransactionListener(processListener)
-    }
-
-    fun clearTransactionListener() {
-        this.communicator = null
-        this.configCommunicator = null
-        posTransactionExecutor.clearAllListeners()
-    }
-
     private val processListener = ProcessTransactionResponseListener { res ->
         Log.d(PRINT_TAG, "Process Response: $res")
         CoroutineScope(Dispatchers.IO).launch {
@@ -115,27 +62,59 @@ class DsiEMVManager(
         }
     }
 
-    private suspend fun checkErrorResponse(xml: String) {
-        val error = posXMLResponseExtractor.resolveError(xml)
-        error?.let { errorRes ->
-            when (currentPosState.currentOperation) {
-                Operation.Reset -> {
-                    if (errorRes.dsixReturnCode == ErrorCode.PSCS_ERROR.code) {
-                        runTransaction(currentTransaction = Operation.DownloadConfig, nextOperation = currentPosState.nextOperation)
-                        return
-                    } else {
-                        configCommunicator?.onConfigError(errorRes.textResponse)
-                    }
-                }
-                else -> {
-                    communicator?.onError(error)
-                }
-            }
-            runTransaction(currentTransaction = Operation.Reset, nextOperation = Operation.NONE)
-        }
+    suspend fun downloadConfigParams() = withContext(Dispatchers.IO) {
+        runTransaction(
+            currentTransaction = Operation.DownloadConfig,
+            nextOperation = Operation.NONE
+        )
     }
 
-    suspend fun runTransaction(currentTransaction: Operation = Operation.Reset, nextOperation: Operation, amount: String? = null){
+    suspend fun runSaleTransaction(amount: String) = withContext(Dispatchers.IO) {
+       runTransaction(
+           currentTransaction = Operation.EMVSale,
+           nextOperation = Operation.Reset,
+           amount = amount
+       )
+    }
+
+    suspend fun runRecurringTransaction(amount: String) = withContext(Dispatchers.IO) {
+       runTransaction(
+           currentTransaction = Operation.RecurringSale,
+           nextOperation = Operation.Reset,
+           amount = amount
+       )
+    }
+
+    suspend fun replaceCardInRecurring() = withContext(Dispatchers.IO) {
+        runTransaction(
+            currentTransaction = Operation.ReplaceCard,
+            nextOperation = Operation.Reset
+        )
+    }
+
+    suspend fun getClientVersion() = withContext(Dispatchers.IO) {
+        runTransaction(
+            currentTransaction = Operation.GetClientVersion,
+            nextOperation = Operation.Reset
+        )
+    }
+
+    suspend fun readPrepaidCard() = withContext(Dispatchers.IO) {
+        runTransaction(
+            currentTransaction = Operation.ReadPrepaidCard,
+            nextOperation = Operation.Reset
+        )
+    }
+
+    suspend fun cancelTransaction(){
+        posTransactionExecutor.cancelTransaction()
+    }
+
+    private suspend fun runTransaction(
+        currentTransaction: Operation = Operation.Reset,
+        nextOperation: Operation,
+        amount: String? = null
+    ){
         if(amount != null)
             transactionAmount = amount
 
@@ -146,31 +125,31 @@ class DsiEMVManager(
             }
             Operation.Reset -> {
                 currentPosState = PosState.Running(currentTransaction, nextOperation)
-                resetPinPad()
+                posTransactionExecutor.resetPinPad()
             }
             Operation.DownloadConfig -> {
                 currentPosState = PosState.Running(currentTransaction, nextOperation)
-                downloadConfigParams()
+                posTransactionExecutor.downloadConfig()
             }
             Operation.EMVSale -> {
                 currentPosState = PosState.Running(currentTransaction, nextOperation)
-                runSaleTransaction(transactionAmount!!)
+                amount?.let { amt -> posTransactionExecutor.doSale(amt) }
             }
             Operation.RecurringSale -> {
                 currentPosState = PosState.Running(currentTransaction, nextOperation)
-                runRecurringTransaction(transactionAmount!!)
+                amount?.let { amt -> posTransactionExecutor.doSale(amt) }
             }
             Operation.ReplaceCard -> {
                 currentPosState = PosState.Running(currentTransaction, nextOperation)
-                replaceCardInRecurring()
+                posTransactionExecutor.doReplaceCardInRecurring()
             }
             Operation.GetClientVersion -> {
                 currentPosState = PosState.Running(currentTransaction, nextOperation)
-                getClientVersion()
+                posTransactionExecutor.getClientVersion()
             }
             Operation.ReadPrepaidCard -> {
                 currentPosState = PosState.Running(currentTransaction, nextOperation)
-                readPrepaidCard()
+                posTransactionExecutor.readPrepaidCard()
             }
         }
     }
@@ -227,6 +206,41 @@ class DsiEMVManager(
                 runTransaction(Operation.NONE, Operation.NONE)
             }
         }
+    }
+
+    private suspend fun checkErrorResponse(xml: String) {
+        val error = posXMLResponseExtractor.resolveError(xml)
+        error?.let { errorRes ->
+            when (currentPosState.currentOperation) {
+                Operation.Reset -> {
+                    if (errorRes.dsixReturnCode == ErrorCode.PSCS_ERROR.code) {
+                        runTransaction(currentTransaction = Operation.DownloadConfig, nextOperation = currentPosState.nextOperation)
+                        return
+                    } else {
+                        configCommunicator?.onConfigError(errorRes.textResponse)
+                    }
+                }
+                else -> {
+                    communicator?.onError(error)
+                    runTransaction(currentTransaction = Operation.Reset, nextOperation = Operation.NONE)
+                }
+            }
+        }
+    }
+
+    fun registerListener(
+        communicator: EMVTransactionCommunicator,
+        configurationCommunicator: ConfigurationCommunicator? = null
+    ) {
+        this.communicator = communicator
+        this.configCommunicator = configurationCommunicator
+        posTransactionExecutor.addPosTransactionListener(processListener)
+    }
+
+    fun clearTransactionListener() {
+        this.communicator = null
+        this.configCommunicator = null
+        posTransactionExecutor.clearAllListeners()
     }
 
 }

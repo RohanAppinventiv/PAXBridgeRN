@@ -21,9 +21,24 @@ import {
   SafeAreaProvider,
   SafeAreaView,
 } from 'react-native-safe-area-context';
-import { NativeModules } from 'react-native';
+import { NativeModules, DeviceEventEmitter } from 'react-native';
 
 const { DsiEMVManager } = NativeModules;
+
+// Event names mirrored from native `BridgeEvent`
+const BridgeEvent = {
+  ERROR_EVENT: 'ERROR_EVENT',
+  SALE_SUCCESS: 'SALE_SUCCESS',
+  PREPAID_READ_SUCCESS: 'PREPAID_READ_SUCCESS',
+  RECURRING_SALE_SUCCESS: 'RECURRING_SALE_SUCCESS',
+  ZERO_AUTH_SUCCESS: 'ZERO_AUTH_SUCCESS',
+  CLIENT_VERSION_FETCH_SUCCESS: 'CLIENT_VERSION_FETCH_SUCCESS',
+  MESSAGE_EVENT: 'MESSAGE_EVENT',
+  CONFIG_PING_SUCCESS: 'CONFIG_PING_SUCCESS',
+  CONFIG_PING_FAIL: 'CONFIG_PING_FAIL',
+  CONFIG_ERROR: 'CONFIG_ERROR',
+  CONFIG_COMPLETED: 'CONFIG_COMPLETED',
+} as const;
 
 interface Config {
   merchantID: string;
@@ -51,6 +66,7 @@ function AppContent() {
   const [isInitialized, setIsInitialized] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [amount, setAmount] = useState('10.00');
+  const [lastEvent, setLastEvent] = useState<{ name: string; payload?: any } | null>(null);
   const [config, setConfig] = useState<Config>({
     merchantID: 'SONNYTAMA35000GP',
     onlineMerchantID: 'SONNYTAMA35000GP',
@@ -66,6 +82,69 @@ function AppContent() {
     initializeEMV();
   }, []);
 
+  // Centralized native event subscriptions
+  useEffect(() => {
+    const subs = [
+      DeviceEventEmitter.addListener(BridgeEvent.ERROR_EVENT, (payload) => {
+        console.log('[EVENT]', BridgeEvent.ERROR_EVENT, payload);
+        setIsLoading(false);
+        setLastEvent({ name: BridgeEvent.ERROR_EVENT, payload });
+        Alert.alert('Error', payload?.textResponse || 'Operation failed');
+      }),
+      DeviceEventEmitter.addListener(BridgeEvent.SALE_SUCCESS, (payload) => {
+        console.log('[EVENT]', BridgeEvent.SALE_SUCCESS, payload);
+        setIsLoading(false);
+        setLastEvent({ name: BridgeEvent.SALE_SUCCESS, payload });
+        Alert.alert('Sale Success', `Auth: ${payload?.authCode ?? 'N/A'}  Amount: ${payload?.amount?.purchase ?? ''}`);
+      }),
+      DeviceEventEmitter.addListener(BridgeEvent.PREPAID_READ_SUCCESS, (payload) => {
+        console.log('[EVENT]', BridgeEvent.PREPAID_READ_SUCCESS, payload);
+        setIsLoading(false);
+        setLastEvent({ name: BridgeEvent.PREPAID_READ_SUCCESS, payload });
+        Alert.alert('Card Read', payload?.cardholderName ?? 'Prepaid card read');
+      }),
+      DeviceEventEmitter.addListener(BridgeEvent.RECURRING_SALE_SUCCESS, (payload) => {
+        console.log('[EVENT]', BridgeEvent.RECURRING_SALE_SUCCESS, payload);
+        setIsLoading(false);
+        setLastEvent({ name: BridgeEvent.RECURRING_SALE_SUCCESS, payload });
+        Alert.alert('Recurring Sale', `Auth: ${payload?.authCode ?? 'N/A'}`);
+      }),
+      DeviceEventEmitter.addListener(BridgeEvent.ZERO_AUTH_SUCCESS, (payload) => {
+        console.log('[EVENT]', BridgeEvent.ZERO_AUTH_SUCCESS, payload);
+        setIsLoading(false);
+        setLastEvent({ name: BridgeEvent.ZERO_AUTH_SUCCESS, payload });
+        Alert.alert('$0 Auth', `Ref: ${payload?.refNo ?? 'N/A'}`);
+      }),
+      DeviceEventEmitter.addListener(BridgeEvent.CLIENT_VERSION_FETCH_SUCCESS, (payload) => {
+        console.log('[EVENT]', BridgeEvent.CLIENT_VERSION_FETCH_SUCCESS, payload);
+        setIsLoading(false);
+        setLastEvent({ name: BridgeEvent.CLIENT_VERSION_FETCH_SUCCESS, payload });
+      }),
+      DeviceEventEmitter.addListener(BridgeEvent.MESSAGE_EVENT, (message) => {
+        console.log('[EVENT]', BridgeEvent.MESSAGE_EVENT, message);
+        setLastEvent({ name: BridgeEvent.MESSAGE_EVENT, payload: message });
+      }),
+      DeviceEventEmitter.addListener(BridgeEvent.CONFIG_PING_SUCCESS, (payload) => {
+        console.log('[EVENT]', BridgeEvent.CONFIG_PING_SUCCESS, payload);
+        setLastEvent({ name: BridgeEvent.CONFIG_PING_SUCCESS, payload });
+      }),
+      DeviceEventEmitter.addListener(BridgeEvent.CONFIG_PING_FAIL, (payload) => {
+        console.log('[EVENT]', BridgeEvent.CONFIG_PING_FAIL, payload);
+        setLastEvent({ name: BridgeEvent.CONFIG_PING_FAIL, payload });
+      }),
+      DeviceEventEmitter.addListener(BridgeEvent.CONFIG_ERROR, (payload) => {
+        console.log('[EVENT]', BridgeEvent.CONFIG_ERROR, payload);
+        setLastEvent({ name: BridgeEvent.CONFIG_ERROR, payload });
+      }),
+      DeviceEventEmitter.addListener(BridgeEvent.CONFIG_COMPLETED, (payload) => {
+        console.log('[EVENT]', BridgeEvent.CONFIG_COMPLETED, payload);
+        setLastEvent({ name: BridgeEvent.CONFIG_COMPLETED, payload });
+      }),
+    ];
+
+    return () => subs.forEach((s) => s.remove());
+  }, []);
+
   const initializeEMV = async () => {
     try {
       setIsLoading(true);
@@ -75,7 +154,7 @@ function AppContent() {
       Alert.alert('Success', 'EMV Manager initialized successfully');
     } catch (error) {
       console.error('Failed to initialize EMV Manager:', error);
-      Alert.alert('Error', `Failed to initialize: ${error.message}`);
+      Alert.alert('Error', `Failed to initialize: ${(error as any)?.message ?? String(error)}`);
     } finally {
       setIsLoading(false);
     }
@@ -94,7 +173,7 @@ function AppContent() {
       Alert.alert('Success', 'Sale transaction initiated');
     } catch (error) {
       console.error('Sale transaction failed:', error);
-      Alert.alert('Error', `Sale failed: ${error.message}`);
+      Alert.alert('Error', `Sale failed: ${(error as any)?.message ?? String(error)}`);
     } finally {
       setIsLoading(false);
     }
@@ -113,7 +192,7 @@ function AppContent() {
       Alert.alert('Success', 'Prepaid card read initiated');
     } catch (error) {
       console.error('Prepaid card read failed:', error);
-      Alert.alert('Error', `Prepaid card read failed: ${error.message}`);
+      Alert.alert('Error', `Prepaid card read failed: ${(error as any)?.message ?? String(error)}`);
     } finally {
       setIsLoading(false);
     }
@@ -132,7 +211,7 @@ function AppContent() {
       Alert.alert('Success', 'Recurring sale initiated');
     } catch (error) {
       console.error('Recurring sale failed:', error);
-      Alert.alert('Error', `Recurring sale failed: ${error.message}`);
+      Alert.alert('Error', `Recurring sale failed: ${(error as any)?.message ?? String(error)}`);
     } finally {
       setIsLoading(false);
     }
@@ -146,12 +225,12 @@ function AppContent() {
 
     try {
       setIsLoading(true);
-      const result = await DsiEMVManager.doSale('0.00');
+      const result = await DsiEMVManager.replaceCreditCard();
       console.log('$0 Auth initiated:', result);
       Alert.alert('Success', '$0 Auth initiated');
     } catch (error) {
       console.error('$0 Auth failed:', error);
-      Alert.alert('Error', `$0 Auth failed: ${error.message}`);
+      Alert.alert('Error', `$0 Auth failed: ${(error as any)?.message ?? String(error)}`);
     } finally {
       setIsLoading(false);
     }
@@ -170,7 +249,7 @@ function AppContent() {
       Alert.alert('Success', 'Transaction cancelled');
     } catch (error) {
       console.error('Cancel transaction failed:', error);
-      Alert.alert('Error', `Cancel failed: ${error.message}`);
+      Alert.alert('Error', `Cancel failed: ${(error as any)?.message ?? String(error)}`);
     } finally {
       setIsLoading(false);
     }
@@ -189,7 +268,7 @@ function AppContent() {
       Alert.alert('Success', 'Config download initiated');
     } catch (error) {
       console.error('Config download failed:', error);
-      Alert.alert('Error', `Config download failed: ${error.message}`);
+      Alert.alert('Error', `Config download failed: ${(error as any)?.message ?? String(error)}`);
     } finally {
       setIsLoading(false);
     }
@@ -275,8 +354,16 @@ function AppContent() {
         </View>
 
         {isLoading && (
-          <View style={styles.loadingContainer}>
+          <View style={styles.loadingContainer} pointerEvents="none">
             <Text style={styles.loadingText}>Processing...</Text>
+          </View>
+        )}
+
+        {lastEvent && (
+          <View style={{ marginTop: 12, alignItems: 'center' }}>
+            <Text style={{ fontSize: 12, color: '#666' }}>
+              Last Event: {lastEvent.name}
+            </Text>
           </View>
         )}
       </ScrollView>

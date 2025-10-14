@@ -74,7 +74,7 @@ class POSTransactionExecutor(context: Context, posConfig: ConfigFactory) {
         withContext(Dispatchers.IO){
             Log.d(PRINT_TAG, "Inside Reset Pin()")
             val request = requestBuilder.buildPinPadResetRequest()
-            Log.d(PRINT_TAG, "Reset Request: $request")
+            Log.d(PRINT_TAG, "Reset Request R: $request")
             dsiEMVAndroidLib.ProcessTransaction(
                 request
             )
