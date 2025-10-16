@@ -17,14 +17,64 @@ import kotlinx.coroutines.launch
 import com.paxbridgern.BridgeEvent
 import com.facebook.react.modules.core.DeviceEventManagerModule
 
+/**
+ * React Native bridge module for DSI EMV payment processing functionality.
+ * 
+ * This module provides a bridge between React Native and the DSI EMV handheld library,
+ * enabling payment processing operations including sales, recurring transactions,
+ * card reading, and configuration management. It handles all communication between
+ * the JavaScript layer and the native Android EMV library.
+ * 
+ * Key Features:
+ * - Payment transaction processing (sale, recurring sale)
+ * - Card reading and validation
+ * - Configuration management and download
+ * - Error handling and event emission
+ * - Asynchronous operation support using coroutines
+ * 
+ * The module uses two main communicator interfaces:
+ * - EMVTransactionCommunicator: Handles transaction-related callbacks
+ * - ConfigurationCommunicator: Handles configuration-related callbacks
+ * 
+ * All operations are performed asynchronously and results are communicated back
+ * to React Native through events and promises.
+ * 
+ * @param reactContext The React Native application context
+ */
 class DsiEMVManagerModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
     
+    /** The DSI EMV Manager instance for handling payment operations */
     private var dsiEMVManager: DsiEMVManager? = null
+    
+    /** Coroutine scope for handling asynchronous operations on the main dispatcher */
     private val coroutineScope = CoroutineScope(Dispatchers.Main)
     
+    /**
+     * Returns the name of this native module as it will be exposed to React Native.
+     * 
+     * @return The module name "DsiEMVManager"
+     */
     override fun getName(): String = "DsiEMVManager"
 
+    /**
+     * EMV Transaction Communicator implementation for handling transaction-related callbacks.
+     * 
+     * This object implements the EMVTransactionCommunicator interface and handles all
+     * transaction-related events from the DSI EMV library. It processes various types
+     * of responses including sales, recurring transactions, card reading, and error states.
+     * 
+     * All callbacks convert the native library responses into React Native-compatible
+     * data structures and emit events to the JavaScript layer.
+     */
     val emvCommunicator = object : EMVTransactionCommunicator {
+        /**
+         * Handles error responses from EMV operations.
+         * 
+         * This callback is triggered when any EMV operation encounters an error.
+         * It extracts error details and sends them to React Native as an error event.
+         * 
+         * @param error The error response containing error details
+         */
         override fun onError(error: ErrorResponse) {
             Log.e("DsiEMVManagerModule", "EMV Error: $error")
             val map = Arguments.createMap().apply {
@@ -38,6 +88,14 @@ class DsiEMVManagerModule(reactContext: ReactApplicationContext) : ReactContextB
             sendEvent(BridgeEvent.ERROR_EVENT, map)
         }
 
+        /**
+         * Handles successful card reading operations.
+         * 
+         * This callback is triggered when a card is successfully read from the EMV device.
+         * It extracts card data including track information and sends it to React Native.
+         * 
+         * @param cardData The card data containing track information and status
+         */
         override fun onCardReadSuccessfully(cardData: CardData) {
             Log.d("DsiEMVManagerModule", "Card read successfully: $cardData")
             val map = Arguments.createMap().apply {
@@ -53,6 +111,15 @@ class DsiEMVManagerModule(reactContext: ReactApplicationContext) : ReactContextB
             sendEvent(BridgeEvent.PREPAID_READ_SUCCESS, map)
         }
 
+        /**
+         * Handles successful sale transaction completion.
+         * 
+         * This callback is triggered when a sale transaction is successfully completed.
+         * It extracts comprehensive transaction details including payment information,
+         * cardholder data, and transaction metadata, then sends it to React Native.
+         * 
+         * @param saleDetails The sale transaction response containing all transaction details
+         */
         override fun onSaleTransactionCompleted(saleDetails: SaleTransactionResponse) {
             Log.d("DsiEMVManagerModule", "Sale completed: $saleDetails")
             val map = Arguments.createMap().apply {
@@ -94,6 +161,14 @@ class DsiEMVManagerModule(reactContext: ReactApplicationContext) : ReactContextB
             sendEvent(BridgeEvent.SALE_SUCCESS, map)
         }
 
+        /**
+         * Handles successful recurring sale transaction completion.
+         * 
+         * This callback is triggered when a recurring sale transaction is successfully completed.
+         * It processes the recurring transaction response and sends the details to React Native.
+         * 
+         * @param recurringDetails The recurring transaction response containing transaction details
+         */
         override fun onRecurringSaleCompleted(recurringDetails: RecurringTransactionResponse) {
             Log.d("DsiEMVManagerModule", "Recurring sale completed: $recurringDetails")
             val map = Arguments.createMap().apply {
@@ -135,6 +210,14 @@ class DsiEMVManagerModule(reactContext: ReactApplicationContext) : ReactContextB
             sendEvent(BridgeEvent.RECURRING_SALE_SUCCESS, map)
         }
 
+        /**
+         * Handles successful card replacement transaction completion.
+         * 
+         * This callback is triggered when a card replacement (zero auth) transaction is completed.
+         * It processes the zero auth response and sends comprehensive transaction details to React Native.
+         * 
+         * @param zeroAuthData The zero auth transaction response containing card replacement details
+         */
         override fun onCardReplaceTransactionCompleted(zeroAuthData: ZeroAuthTransactionResponse) {
             Log.d("DsiEMVManagerModule", "Card replace completed: $zeroAuthData")
             val map = Arguments.createMap().apply {
@@ -184,6 +267,14 @@ class DsiEMVManagerModule(reactContext: ReactApplicationContext) : ReactContextB
             sendEvent(BridgeEvent.ZERO_AUTH_SUCCESS, map)
         }
 
+        /**
+         * Handles successful client version retrieval.
+         * 
+         * This callback is triggered when the client version information is successfully retrieved.
+         * It sends version details to React Native for debugging and compatibility purposes.
+         * 
+         * @param clientVersionDetails The client version response containing version information
+         */
         override fun onClientVersionCompleted(clientVersionDetails: ClientVersionResponse) {
             Log.d("DsiEMVManagerModule", "Client version: $clientVersionDetails")
             val map = Arguments.createMap().apply {
@@ -203,18 +294,50 @@ class DsiEMVManagerModule(reactContext: ReactApplicationContext) : ReactContextB
             sendEvent(BridgeEvent.CLIENT_VERSION_FETCH_SUCCESS, map)
         }
 
+        /**
+         * Handles display messages from the EMV library.
+         * 
+         * This callback is triggered when the EMV library needs to display a message to the user.
+         * It forwards the message to React Native for display in the UI.
+         * 
+         * @param message The message to display to the user
+         */
         override fun onShowMessage(message: String) {
             Log.d("DsiEMVManagerModule", "Message: $message")
             sendEvent(BridgeEvent.MESSAGE_EVENT, message)
         }
     }
 
+    /**
+     * Configuration Communicator implementation for handling configuration-related callbacks.
+     * 
+     * This object implements the ConfigurationCommunicator interface and handles all
+     * configuration-related events from the DSI EMV library. It processes configuration
+     * operations including setup, ping tests, and error states.
+     * 
+     * All callbacks convert the native library responses into React Native-compatible
+     * data structures and emit events to the JavaScript layer.
+     */
     val configCommunicator = object : ConfigurationCommunicator {
+        /**
+         * Handles configuration errors.
+         * 
+         * This callback is triggered when a configuration operation encounters an error.
+         * It sends the error message to React Native for handling.
+         * 
+         * @param errorMessage The error message describing the configuration issue
+         */
         override fun onConfigError(errorMessage: String) {
             Log.e("DsiEMVManagerModule", "Config error: $errorMessage")
             sendEvent(BridgeEvent.CONFIG_ERROR, errorMessage)
         }
 
+        /**
+         * Handles configuration ping failure.
+         * 
+         * This callback is triggered when the configuration ping test fails.
+         * It sends a failure status to React Native with timestamp information.
+         */
         override fun onConfigPingFailed() {
             Log.e("DsiEMVManagerModule", "Config ping failed")
             val failedMap = Arguments.createMap().apply {
@@ -225,6 +348,12 @@ class DsiEMVManagerModule(reactContext: ReactApplicationContext) : ReactContextB
             sendEvent(BridgeEvent.CONFIG_PING_FAIL, failedMap)
         }
 
+        /**
+         * Handles successful configuration ping.
+         * 
+         * This callback is triggered when the configuration ping test succeeds.
+         * It sends a success status to React Native with timestamp information.
+         */
         override fun onConfigPingSuccess() {
             Log.d("DsiEMVManagerModule", "Config ping success")
             val successMap = Arguments.createMap().apply {
@@ -235,6 +364,12 @@ class DsiEMVManagerModule(reactContext: ReactApplicationContext) : ReactContextB
             sendEvent(BridgeEvent.CONFIG_PING_SUCCESS, successMap)
         }
 
+        /**
+         * Handles configuration completion.
+         * 
+         * This callback is triggered when the configuration setup is fully completed.
+         * It sends a completion status to React Native with timestamp information.
+         */
         override fun onConfigCompleted() {
             Log.d("DsiEMVManagerModule", "Config completed")
             val completedMap = Arguments.createMap().apply {
@@ -246,6 +381,23 @@ class DsiEMVManagerModule(reactContext: ReactApplicationContext) : ReactContextB
         }
     }
     
+    /**
+     * Initializes the DSI EMV Manager with the provided configuration.
+     * 
+     * This method sets up the EMV manager with merchant and device configuration,
+     * registers the communicator listeners, and prepares the system for payment operations.
+     * 
+     * @param config A ReadableMap containing the POS configuration parameters:
+     *               - merchantID: String (required)
+     *               - onlineMerchantID: String (required)
+     *               - isSandBox: Boolean (optional, defaults to true)
+     *               - secureDeviceName: String (required)
+     *               - operatorID: String (required)
+     *               - posPackageID: String (required)
+     *               - pinPadIPAddress: String (required)
+     *               - pinPadPort: String (required)
+     * @param promise A Promise that resolves with success message or rejects with error
+     */
     @ReactMethod
     fun initialize(config: ReadableMap, promise: Promise) {
         try {
@@ -261,6 +413,15 @@ class DsiEMVManagerModule(reactContext: ReactApplicationContext) : ReactContextB
         }
     }
     
+    /**
+     * Initiates a sale transaction with the specified amount.
+     * 
+     * This method starts a payment transaction process asynchronously. The actual
+     * transaction result will be delivered through the EMV communicator callbacks.
+     * 
+     * @param amount The transaction amount as a string (e.g., "10.00")
+     * @param promise A Promise that resolves immediately or rejects if setup fails
+     */
     @ReactMethod
     fun doSale(amount: String, promise: Promise) {
         try {
@@ -279,6 +440,15 @@ class DsiEMVManagerModule(reactContext: ReactApplicationContext) : ReactContextB
         }
     }
     
+    /**
+     * Initiates a recurring sale transaction with the specified amount.
+     * 
+     * This method starts a recurring payment transaction process asynchronously.
+     * The actual transaction result will be delivered through the EMV communicator callbacks.
+     * 
+     * @param amount The transaction amount as a string (e.g., "10.00")
+     * @param promise A Promise that resolves immediately or rejects if setup fails
+     */
     @ReactMethod
     fun doRecurringSale(amount: String, promise: Promise) {
         try {
@@ -298,6 +468,14 @@ class DsiEMVManagerModule(reactContext: ReactApplicationContext) : ReactContextB
         }
     }
     
+    /**
+     * Cancels the currently active transaction.
+     * 
+     * This method cancels any ongoing transaction operation. It should be called
+     * when the user wants to abort a transaction in progress.
+     * 
+     * @param promise A Promise that resolves when cancellation is complete or rejects on error
+     */
     @ReactMethod
     fun cancelTransaction(promise: Promise) {
         try {
@@ -317,6 +495,15 @@ class DsiEMVManagerModule(reactContext: ReactApplicationContext) : ReactContextB
         }
     }
     
+    /**
+     * Downloads configuration parameters from the payment processor.
+     * 
+     * This method initiates the download of configuration parameters required
+     * for payment processing. The result will be delivered through configuration
+     * communicator callbacks.
+     * 
+     * @param promise A Promise that resolves immediately or rejects if setup fails
+     */
     @ReactMethod
     fun downloadConfig(promise: Promise) {
         try {
@@ -336,6 +523,14 @@ class DsiEMVManagerModule(reactContext: ReactApplicationContext) : ReactContextB
         }
     }
     
+    /**
+     * Retrieves the client version information.
+     * 
+     * This method fetches version information about the EMV client library.
+     * The result will be delivered through the EMV communicator callbacks.
+     * 
+     * @param promise A Promise that resolves immediately or rejects if setup fails
+     */
     @ReactMethod
     fun getClientVersion(promise: Promise) {
         try {
@@ -355,6 +550,14 @@ class DsiEMVManagerModule(reactContext: ReactApplicationContext) : ReactContextB
         }
     }
     
+    /**
+     * Initiates reading of a prepaid card.
+     * 
+     * This method starts the process of reading card data from a prepaid card.
+     * The card data will be delivered through the EMV communicator callbacks.
+     * 
+     * @param promise A Promise that resolves immediately or rejects if setup fails
+     */
     @ReactMethod
     fun readPrepaidCard(promise: Promise) {
         try {
@@ -375,6 +578,14 @@ class DsiEMVManagerModule(reactContext: ReactApplicationContext) : ReactContextB
     }
 
 
+    /**
+     * Initiates a credit card replacement transaction.
+     * 
+     * This method starts a card replacement (zero auth) transaction process.
+     * The transaction result will be delivered through the EMV communicator callbacks.
+     * 
+     * @param promise A Promise that resolves immediately or rejects if setup fails
+     */
     @ReactMethod
     fun replaceCreditCard(promise: Promise) {
         try {
@@ -393,6 +604,14 @@ class DsiEMVManagerModule(reactContext: ReactApplicationContext) : ReactContextB
         }
     }
 
+    /**
+     * Cleans up resources and unregisters listeners.
+     * 
+     * This method should be called when the module is no longer needed to properly
+     * clean up resources, unregister listeners, and prevent memory leaks.
+     * 
+     * @param promise A Promise that resolves when cleanup is complete or rejects on error
+     */
     @ReactMethod
     fun cleanup(promise: Promise) {
         try {
@@ -405,6 +624,16 @@ class DsiEMVManagerModule(reactContext: ReactApplicationContext) : ReactContextB
         }
     }
 
+    /**
+     * Sends an event to the React Native JavaScript layer.
+     * 
+     * This private helper method is used to emit events from the native Android layer
+     * to the React Native JavaScript layer. It handles the conversion of native data
+     * structures to React Native-compatible formats and ensures proper event delivery.
+     * 
+     * @param eventName The name of the event to emit (should match BridgeEvent constants)
+     * @param params The event parameters (can be null, String, or WritableMap)
+     */
     private fun sendEvent(eventName: String, params: Any?) {
         Log.d("DsiEMVManagerModule", "sendEvent: $eventName with params: $params")
         reactApplicationContext

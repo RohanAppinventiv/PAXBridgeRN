@@ -19,6 +19,26 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.getValue
 
+/**
+ * Main manager class for DSI EMV payment processing operations.
+ * 
+ * This class serves as the central coordinator for all EMV payment operations.
+ * It manages the state machine, coordinates between different components,
+ * and handles the flow of transactions from initiation to completion.
+ * 
+ * Key Responsibilities:
+ * - State management for POS operations
+ * - Transaction flow coordination
+ * - Response processing and routing
+ * - Error handling and recovery
+ * - Listener management for callbacks
+ * 
+ * The manager uses a state machine pattern to ensure proper sequencing
+ * of operations and handles both success and error scenarios gracefully.
+ * 
+ * @param context The Android application context
+ * @param posConfig The POS configuration factory containing merchant and device settings
+ */
 class DsiEMVManager(
     val context: Context,
     posConfig: ConfigFactory
@@ -62,6 +82,13 @@ class DsiEMVManager(
         }
     }
 
+    /**
+     * Downloads configuration parameters from the payment processor.
+     * 
+     * This method initiates the download of configuration parameters required
+     * for payment processing. It runs on the IO dispatcher to avoid blocking
+     * the main thread.
+     */
     suspend fun downloadConfigParams() = withContext(Dispatchers.IO) {
         runTransaction(
             currentTransaction = Operation.DownloadConfig,
@@ -69,6 +96,14 @@ class DsiEMVManager(
         )
     }
 
+    /**
+     * Executes a standard EMV sale transaction.
+     * 
+     * This method processes a payment transaction with the specified amount.
+     * It runs on the IO dispatcher and includes a reset operation after completion.
+     * 
+     * @param amount The transaction amount as a string (e.g., "10.00")
+     */
     suspend fun runSaleTransaction(amount: String) = withContext(Dispatchers.IO) {
        runTransaction(
            currentTransaction = Operation.EMVSale,
@@ -77,6 +112,14 @@ class DsiEMVManager(
        )
     }
 
+    /**
+     * Executes a recurring EMV sale transaction.
+     * 
+     * This method processes a recurring payment transaction with the specified amount.
+     * It runs on the IO dispatcher and includes a reset operation after completion.
+     * 
+     * @param amount The transaction amount as a string (e.g., "10.00")
+     */
     suspend fun runRecurringTransaction(amount: String) = withContext(Dispatchers.IO) {
        runTransaction(
            currentTransaction = Operation.RecurringSale,
@@ -85,6 +128,13 @@ class DsiEMVManager(
        )
     }
 
+    /**
+     * Executes a card replacement transaction for recurring payments.
+     * 
+     * This method processes a card replacement (zero auth) transaction to update
+     * the payment method for recurring payments. It runs on the IO dispatcher
+     * and includes a reset operation after completion.
+     */
     suspend fun replaceCardInRecurring() = withContext(Dispatchers.IO) {
         runTransaction(
             currentTransaction = Operation.ReplaceCard,
@@ -92,6 +142,13 @@ class DsiEMVManager(
         )
     }
 
+    /**
+     * Retrieves the client version information.
+     * 
+     * This method fetches version information about the EMV client library.
+     * It runs on the IO dispatcher and includes a reset operation after completion.
+     * This is useful for debugging and compatibility checks.
+     */
     suspend fun getClientVersion() = withContext(Dispatchers.IO) {
         runTransaction(
             currentTransaction = Operation.GetClientVersion,
@@ -99,6 +156,13 @@ class DsiEMVManager(
         )
     }
 
+    /**
+     * Reads data from a prepaid card.
+     * 
+     * This method initiates the reading of card data from a prepaid card.
+     * It runs on the IO dispatcher and includes a reset operation after completion.
+     * The card data will be returned through the communicator callbacks.
+     */
     suspend fun readPrepaidCard() = withContext(Dispatchers.IO) {
         runTransaction(
             currentTransaction = Operation.ReadPrepaidCard,
@@ -106,6 +170,13 @@ class DsiEMVManager(
         )
     }
 
+    /**
+     * Cancels the currently active transaction.
+     * 
+     * This method cancels any ongoing transaction operation. It should be called
+     * when the user wants to abort a transaction in progress or when an error
+     * condition requires transaction cancellation.
+     */
     suspend fun cancelTransaction(){
         posTransactionExecutor.cancelTransaction()
     }
@@ -228,6 +299,16 @@ class DsiEMVManager(
         }
     }
 
+    /**
+     * Registers listeners for transaction and configuration events.
+     * 
+     * This method sets up the communication channels between the manager and
+     * the external components that need to respond to EMV events. It registers
+     * both transaction and configuration communicators.
+     * 
+     * @param communicator The EMV transaction communicator for handling transaction events
+     * @param configurationCommunicator The configuration communicator for handling config events (optional)
+     */
     fun registerListener(
         communicator: EMVTransactionCommunicator,
         configurationCommunicator: ConfigurationCommunicator? = null
@@ -237,6 +318,13 @@ class DsiEMVManager(
         posTransactionExecutor.addPosTransactionListener(processListener)
     }
 
+    /**
+     * Clears all registered listeners and cleans up resources.
+     * 
+     * This method removes all registered communicators and clears all listeners
+     * from the transaction executor. It should be called when the manager is
+     * no longer needed to prevent memory leaks and ensure proper cleanup.
+     */
     fun clearTransactionListener() {
         this.communicator = null
         this.configCommunicator = null

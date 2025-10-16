@@ -9,16 +9,40 @@ import com.quivio.emvhandheldlib.models.RecurringTransactionResponse
 import com.quivio.emvhandheldlib.models.SaleTransactionResponse
 import com.quivio.emvhandheldlib.models.ZeroAuthTransactionResponse
 
-
+/**
+ * Utility class for extracting structured data from XML response strings.
+ * 
+ * This class provides methods to parse XML responses from the DSI EMV library
+ * and convert them into strongly-typed Kotlin data classes. It handles various
+ * types of responses including transaction results, error responses, and
+ * configuration data.
+ * 
+ * Key Features:
+ * - XML tag extraction using regex patterns
+ * - Type-safe conversion to data models
+ * - Error handling and fallback mechanisms
+ * - Support for multiple response types
+ * 
+ * The extractor uses regex patterns to find and extract values from XML tags,
+ * providing a robust way to parse the structured response data.
+ */
 class XMLResponseExtractor {
 
     companion object {
+        /** Log tag for debugging purposes */
         private const val TAG = "XMLResponseExtractor"
     }
 
     /**
-     * Returns the inner text of the first occurrence of <tagName> … </tagName>
-     * or null if the tag isn't present.
+     * Extracts the inner text content of an XML tag.
+     * 
+     * This private helper method uses regex to find and extract the text content
+     * between opening and closing XML tags. It handles case-insensitive matching
+     * and supports multiline content.
+     * 
+     * @param xml The XML string to search in
+     * @param tagName The name of the tag to extract (without angle brackets)
+     * @return The inner text content of the tag, or null if the tag is not found
      */
     private fun getTag(xml: String, tagName: String): String? {
         // (?s) ⇒ dot matches newline
@@ -27,8 +51,14 @@ class XMLResponseExtractor {
     }
 
     /**
-     * Extracts all sale response fields from XML
-     * Returns a SaleTransactionResponse object containing all extracted fields
+     * Extracts sale transaction response data from XML.
+     * 
+     * This method parses XML response data and converts it into a SaleTransactionResponse
+     * object containing all the transaction details from a successful sale operation.
+     * It handles both command response fields and transaction response fields.
+     * 
+     * @param xml The XML response string from the DSI EMV library
+     * @return A SaleTransactionResponse object with extracted data, or null if parsing fails
      */
     fun extractSaleResponse(xml: String): SaleTransactionResponse? = try {
         // helper to fetch a tag or default to ""
@@ -79,8 +109,14 @@ class XMLResponseExtractor {
     }
 
     /**
-     * Extracts comprehensive response fields from XML including all specified tags
-     * Returns a ComprehensiveTransactionResponse object containing all extracted fields
+     * Extracts recurring transaction response data from XML.
+     * 
+     * This method parses XML response data and converts it into a RecurringTransactionResponse
+     * object containing all the transaction details from a successful recurring sale operation.
+     * It extracts the same fields as a regular sale but is specifically for recurring payments.
+     * 
+     * @param xml The XML response string from the DSI EMV library
+     * @return A RecurringTransactionResponse object with extracted data, or null if parsing fails
      */
     fun extractRecurringTransactionResponse(xml: String): RecurringTransactionResponse? = try {
         // helper to fetch a tag or default to ""
@@ -131,8 +167,14 @@ class XMLResponseExtractor {
     }
 
     /**
-     * Extracts ZeroAuth response fields from XML including all specified tags
-     * Returns a ZeroAuth object containing all extracted fields
+     * Extracts zero auth transaction response data from XML.
+     * 
+     * This method parses XML response data and converts it into a ZeroAuthTransactionResponse
+     * object containing all the transaction details from a successful card replacement
+     * operation. It includes EMV-specific fields and transaction metadata.
+     * 
+     * @param xml The XML response string from the DSI EMV library
+     * @return A ZeroAuthTransactionResponse object with extracted data, or null if parsing fails
      */
     fun extractZeroAuthResponse(xml: String): ZeroAuthTransactionResponse? = try {
         // helper to fetch a tag or default to ""
@@ -193,8 +235,14 @@ class XMLResponseExtractor {
     }
 
     /**
-     * Checks if the response indicates a process is already running
-     * Returns true if ResponseOrigin is "Client" and DSIXReturnCode is "003002"
+     * Checks if the response indicates a process is already running.
+     * 
+     * This method examines the XML response to determine if another process
+     * is already running on the EMV device. This is indicated by specific
+     * response origin and return code values.
+     * 
+     * @param xml The XML response string to check
+     * @return true if a process is already running, false otherwise
      */
     fun isProcessAlreadyRunning(xml: String): Boolean {
         return getTag(xml, "ResponseOrigin") == "Client" &&
@@ -202,16 +250,28 @@ class XMLResponseExtractor {
     }
 
     /**
-     * Checks if the response indicates a failure
-     * Returns true if CmdStatus is "Error"
+     * Checks if the response indicates a transaction failure.
+     * 
+     * This method examines the XML response to determine if the transaction
+     * failed. It checks for error status indicators in the command status
+     * or capture status fields.
+     * 
+     * @param xml The XML response string to check
+     * @return true if the transaction failed, false otherwise
      */
     fun isFailed(xml: String): Boolean {
         return getTag(xml, "CmdStatus") == "Error" || getTag(xml, "CaptureStatus") == "Declined"
     }
 
     /**
-     * Extracts error response fields from XML
-     * Returns an ErrorResponse object containing all extracted error fields
+     * Extracts error response data from XML.
+     * 
+     * This method parses XML response data and converts it into an ErrorResponse
+     * object containing all the error details from a failed operation.
+     * It extracts error codes, messages, and other diagnostic information.
+     * 
+     * @param response The XML response string containing error information
+     * @return An ErrorResponse object with extracted error data, or null if parsing fails
      */
     fun resolveError(response: String): ErrorResponse? = try {
         // helper to fetch a tag or default to ""
@@ -235,8 +295,14 @@ class XMLResponseExtractor {
     }
 
     /**
-     * Extracts ClientVersion response fields from XML
-     * Returns a ClientVersionResponse object containing all extracted fields
+     * Extracts client version response data from XML.
+     * 
+     * This method parses XML response data and converts it into a ClientVersionResponse
+     * object containing version information about the EMV client library.
+     * This is useful for debugging and compatibility verification.
+     * 
+     * @param xml The XML response string from the DSI EMV library
+     * @return A ClientVersionResponse object with extracted version data, or null if parsing fails
      */
     fun extractClientVersionResponse(xml: String): ClientVersionResponse? = try {
         // helper to fetch a tag or default to ""
@@ -267,8 +333,14 @@ class XMLResponseExtractor {
     }
 
     /**
-     * Extracts Card read response fields from XML
-     * Returns a ClientVersionResponse object containing all extracted fields
+     * Extracts card data response from XML.
+     * 
+     * This method parses XML response data and converts it into a CardData
+     * object containing track information and status from a card reading operation.
+     * It extracts track 1 and track 2 data along with their status indicators.
+     * 
+     * @param xml The XML response string from the DSI EMV library
+     * @return A CardData object with extracted card information, or null if parsing fails
      */
     fun extractCardResponse(xml: String): CardData? = try {
         // helper to fetch a tag or default to ""
