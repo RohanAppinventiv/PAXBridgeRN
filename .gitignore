@@ -73,3 +73,10 @@ yarn-error.log
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+
+# Configuration files with sensitive data
+config.production.ts
+config.local.ts
+.env
+.env.local
+.env.production

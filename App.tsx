@@ -22,6 +22,7 @@ import {
   SafeAreaView,
 } from 'react-native-safe-area-context';
 import { NativeModules, DeviceEventEmitter } from 'react-native';
+import { Config, getConfig } from './config';
 
 const { DsiEMVManager } = NativeModules;
 
@@ -40,16 +41,7 @@ const BridgeEvent = {
   CONFIG_COMPLETED: 'CONFIG_COMPLETED',
 } as const;
 
-interface Config {
-  merchantID: string;
-  onlineMerchantID: string;
-  isSandBox: boolean;
-  secureDeviceName: string;
-  operatorID: string;
-  posPackageID: string;
-  pinPadIPAddress: string;
-  pinPadPort: string;
-}
+// Config interface is now imported from './config'
 
 function App() {
   const isDarkMode = useColorScheme() === 'dark';
@@ -67,16 +59,8 @@ function AppContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [amount, setAmount] = useState('10.00');
   const [lastEvent, setLastEvent] = useState<{ name: string; payload?: any } | null>(null);
-  const [config, setConfig] = useState<Config>({
-    merchantID: 'SONNYTAMA35000GP',
-    onlineMerchantID: 'SONNYTAMA35000GP',
-    isSandBox: true,
-    secureDeviceName: 'EMV_A920PRO_DATACAP_E2E',
-    operatorID: 'SONNY1012',
-    posPackageID: 'com.quivio.payment:1.0',
-    pinPadIPAddress: '127.0.0.1',
-    pinPadPort: '1235',
-  });
+  // Load configuration from external file
+  const [config, setConfig] = useState<Config>(getConfig(false)); // false = development mode
 
   useEffect(() => {
     initializeEMV();
