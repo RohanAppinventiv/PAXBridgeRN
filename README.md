@@ -1,97 +1,300 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# PAX Bridge React Native
 
-# Getting Started
+A React Native bridge library for integrating PAX payment terminals with mobile applications. This project provides a comprehensive solution for EMV payment processing, card reading, and configuration management through a clean React Native interface.
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+## 🚀 Features
 
-## Step 1: Start Metro
+- **EMV Payment Processing**: Complete support for EMV sale and recurring transactions
+- **Card Reading**: Prepaid card data extraction and validation
+- **Configuration Management**: Dynamic configuration download and management
+- **Error Handling**: Comprehensive error handling and recovery mechanisms
+- **Event-Driven Architecture**: Real-time event communication between native and JavaScript layers
+- **Cross-Platform Support**: Android and iOS compatibility
+- **TypeScript Support**: Full TypeScript definitions for type safety
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+## 📋 Prerequisites
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+- React Native 0.70+
+- Android Studio (for Android development)
+- Xcode (for iOS development)
+- PAX payment terminal hardware
+- DSI EMV Android library (`.aar` file)
 
-```sh
-# Using npm
+## 🛠️ Installation
+
+### 1. Clone the Repository
+
+```bash
+git clone <repository-url>
+cd PAXBridgeRN
+```
+
+### 2. Install Dependencies
+
+```bash
+# Install JavaScript dependencies
+npm install
+
+# For iOS, install CocoaPods dependencies
+cd ios && pod install && cd ..
+```
+
+### 3. Android Setup
+
+1. Place the DSI EMV Android library (`.aar` file) in `android/app/libs/`
+2. Ensure the library is properly referenced in `android/app/build.gradle`
+
+### 4. iOS Setup
+
+1. Follow the standard React Native iOS setup process
+2. Install CocoaPods dependencies as shown above
+
+## 🏗️ Architecture
+
+### Native Bridge Components
+
+#### Android
+- **`DsiEMVManagerModule`**: Main React Native bridge module
+- **`POSConfigFactory`**: Configuration management and validation
+- **`DsiEMVManager`**: Core EMV transaction management
+- **`POSTransactionExecutor`**: Transaction execution and coordination
+- **`XMLResponseExtractor`**: Response parsing and data extraction
+
+#### iOS
+- **`PAXPaymentPackage`**: iOS bridge package
+- **`DsiEMVManagerModule`**: iOS implementation of the bridge module
+
+### Key Interfaces
+
+- **`ConfigFactory`**: Configuration data contract
+- **`EMVTransactionCommunicator`**: Transaction event callbacks
+- **`ConfigurationCommunicator`**: Configuration event callbacks
+
+## 📱 Usage
+
+### 1. Import the Module
+
+```typescript
+import { DsiEMVManager } from 'react-native-pax-bridge';
+```
+
+### 2. Initialize the Manager
+
+```typescript
+const config = {
+  merchantID: 'your-merchant-id',
+  onlineMerchantID: 'your-online-merchant-id',
+  isSandBox: true, // true for sandbox, false for production
+  secureDeviceName: 'your-device-name',
+  operatorID: 'operator-123',
+  posPackageID: 'your-package-id',
+  pinPadIPAddress: '192.168.1.100',
+  pinPadPort: '8080'
+};
+
+await DsiEMVManager.initialize(config);
+```
+
+### 3. Set Up Event Listeners
+
+```typescript
+import { DeviceEventEmitter } from 'react-native';
+
+// Listen for transaction events
+DeviceEventEmitter.addListener('SALE_SUCCESS', (data) => {
+  console.log('Sale completed:', data);
+});
+
+DeviceEventEmitter.addListener('ERROR_EVENT', (error) => {
+  console.error('Transaction error:', error);
+});
+
+// Listen for configuration events
+DeviceEventEmitter.addListener('CONFIG_COMPLETED', (data) => {
+  console.log('Configuration completed:', data);
+});
+```
+
+### 4. Execute Transactions
+
+```typescript
+// Perform a sale transaction
+await DsiEMVManager.doSale('10.00');
+
+// Perform a recurring sale
+await DsiEMVManager.doRecurringSale('25.00');
+
+// Read prepaid card data
+await DsiEMVManager.readPrepaidCard();
+
+// Replace card in recurring setup
+await DsiEMVManager.replaceCreditCard();
+
+// Download configuration
+await DsiEMVManager.downloadConfig();
+
+// Get client version
+await DsiEMVManager.getClientVersion();
+
+// Cancel current transaction
+await DsiEMVManager.cancelTransaction();
+```
+
+### 5. Cleanup
+
+```typescript
+// Clean up resources when done
+await DsiEMVManager.cleanup();
+```
+
+## 📊 Event Types
+
+### Transaction Events
+- `SALE_SUCCESS`: Sale transaction completed successfully
+- `RECURRING_SALE_SUCCESS`: Recurring sale transaction completed
+- `ZERO_AUTH_SUCCESS`: Card replacement transaction completed
+- `PREPAID_READ_SUCCESS`: Prepaid card data read successfully
+- `ERROR_EVENT`: Transaction or operation error occurred
+
+### Configuration Events
+- `CONFIG_COMPLETED`: Configuration setup completed
+- `CONFIG_PING_SUCCESS`: Configuration ping successful
+- `CONFIG_PING_FAIL`: Configuration ping failed
+- `CONFIG_ERROR`: Configuration error occurred
+
+### System Events
+- `MESSAGE_EVENT`: System message from EMV library
+- `CLIENT_VERSION_FETCH_SUCCESS`: Client version retrieved successfully
+
+## 🔧 Configuration
+
+### Required Configuration Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `merchantID` | string | Unique merchant identifier |
+| `onlineMerchantID` | string | Online merchant identifier |
+| `isSandBox` | boolean | Environment flag (true = sandbox, false = production) |
+| `secureDeviceName` | string | Terminal device name |
+| `operatorID` | string | Operator/employee identifier |
+| `posPackageID` | string | POS package identifier |
+| `pinPadIPAddress` | string | PIN pad IP address |
+| `pinPadPort` | string | PIN pad port number |
+
+## 🚀 Getting Started
+
+### Step 1: Start Metro
+
+```bash
 npm start
-
-# OR using Yarn
+# OR
 yarn start
 ```
 
-## Step 2: Build and run your app
+### Step 2: Build and Run
 
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
-
-### Android
-
-```sh
-# Using npm
+#### Android
+```bash
 npm run android
-
-# OR using Yarn
+# OR
 yarn android
 ```
 
-### iOS
-
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
-
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
-
-```sh
-bundle install
-```
-
-Then, and every time you update your native dependencies, run:
-
-```sh
-bundle exec pod install
-```
-
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
-
-```sh
-# Using npm
+#### iOS
+```bash
 npm run ios
-
-# OR using Yarn
+# OR
 yarn ios
 ```
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+## 🧪 Testing
 
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
+The project includes comprehensive test coverage for all major components:
 
-## Step 3: Modify your app
+```bash
+# Run tests
+npm test
 
-Now that you have successfully run the app, let's make changes!
+# Run tests with coverage
+npm run test:coverage
+```
 
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
+## 📚 API Reference
 
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
+### DsiEMVManager Methods
 
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
+| Method | Parameters | Description |
+|--------|------------|-------------|
+| `initialize` | `config: ConfigObject` | Initialize the EMV manager |
+| `doSale` | `amount: string` | Execute a sale transaction |
+| `doRecurringSale` | `amount: string` | Execute a recurring sale |
+| `readPrepaidCard` | - | Read prepaid card data |
+| `replaceCreditCard` | - | Replace card in recurring setup |
+| `downloadConfig` | - | Download configuration parameters |
+| `getClientVersion` | - | Get client version information |
+| `cancelTransaction` | - | Cancel current transaction |
+| `cleanup` | - | Clean up resources |
 
-## Congratulations! :tada:
+## 🔒 Security Considerations
 
-You've successfully run and modified your React Native App. :partying_face:
+- All sensitive data is handled securely through the native layer
+- Configuration data is validated before use
+- Transaction data is encrypted during transmission
+- Proper error handling prevents data leakage
 
-### Now what?
+## 🐛 Troubleshooting
 
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
+### Common Issues
 
-# Troubleshooting
+1. **Initialization Failed**
+   - Verify all configuration parameters are provided
+   - Check network connectivity to PIN pad
+   - Ensure DSI EMV library is properly installed
 
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
+2. **Transaction Errors**
+   - Verify PIN pad connectivity
+   - Check merchant configuration
+   - Ensure proper card insertion
 
-# Learn More
+3. **Configuration Issues**
+   - Verify network settings
+   - Check PIN pad IP address and port
+   - Ensure proper authentication credentials
 
-To learn more about React Native, take a look at the following resources:
+### Debug Mode
 
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+Enable debug logging by setting the log level in the native configuration:
+
+```typescript
+// Enable debug logging
+const config = {
+  // ... other config
+  debugMode: true
+};
+```
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests for new functionality
+5. Submit a pull request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 📞 Support
+
+For support and questions:
+- Create an issue in the repository
+- Check the troubleshooting section
+- Review the API documentation
+
+## 🔄 Version History
+
+- **v1.0.0**: Initial release with basic EMV functionality
+- **v1.1.0**: Added recurring payment support
+- **v1.2.0**: Enhanced error handling and configuration management
+- **v1.3.0**: Added TypeScript support and improved documentation
